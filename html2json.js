@@ -1,3 +1,4 @@
+console.log("app.js loaded");
 function convertHtml2JsonAndSet() {
   const htmlTextAreaValue = document.getElementById("html").value;
   const jsonObj = html2json(htmlTextAreaValue);
@@ -9,83 +10,247 @@ function convertHtml2JsonAndSet() {
   Update this function to convert html into json object.
   You can rewrite it completely, just be sure it accepts htmlText as string and outputs json object.
 */
-function html2json(htmlText) {
+
+function html2json(html) {
+  if (typeof html !== "string") {
+    return {
+      type: "root",
+      children: [],
+    };
+  }
+
+  const root = {
+    type: "root",
+    children: [],
+  };
+
+  const stack = [root];
+
+  const VOID_ELEMENTS = new Set([
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+  ]);
+
+  let i = 0;
+
+  while (i < html.length) {
+    try {
+      if (html.startsWith("<!--", i)) {
+        const end = html.indexOf("-->", i + 4);
+
+        const commentContent =
+          end === -1 ? html.slice(i + 4) : html.slice(i + 4, end);
+
+        stack[stack.length - 1].children.push({
+          type: "comment",
+          content: commentContent,
+        });
+
+        i = end === -1 ? html.length : end + 3;
+        continue;
+      }
+
+      if (html[i] === "<") {
+        const closeIndex = findTagEnd(html, i + 1);
+
+        if (closeIndex === -1) {
+          appendText(stack, html.slice(i));
+          break;
+        }
+
+        const rawTag = html.slice(i + 1, closeIndex).trim();
+
+        if (!rawTag) {
+          i = closeIndex + 1;
+          continue;
+        }
+
+        if (rawTag[0] === "/") {
+          const closingTag = rawTag.slice(1).trim().toLowerCase();
+
+          let foundIndex = -1;
+
+          for (let s = stack.length - 1; s >= 0; s--) {
+            if (stack[s].tag === closingTag) {
+              foundIndex = s;
+              break;
+            }
+          }
+
+          if (foundIndex !== -1) {
+            while (stack.length - 1 >= foundIndex) {
+              stack.pop();
+            }
+          }
+
+          i = closeIndex + 1;
+          continue;
+        }
+        const selfClosing =
+          rawTag.endsWith("/") || VOID_ELEMENTS.has(getTagName(rawTag));
+
+        const parsed = parseOpeningTag(rawTag);
+
+        const node = {
+          type: "element",
+          tag: parsed.tag,
+          attributes: parsed.attributes,
+          children: [],
+        };
+
+        stack[stack.length - 1].children.push(node);
+
+        if (!selfClosing) {
+          stack.push(node);
+        }
+
+        i = closeIndex + 1;
+        continue;
+      }
+
+      let nextTag = html.indexOf("<", i);
+
+      if (nextTag === -1) {
+        nextTag = html.length;
+      }
+
+      const text = html.slice(i, nextTag);
+
+      appendText(stack, text);
+
+      i = nextTag;
+    } catch (error) {
+      i += 1;
+    }
+  }
+  return root;
+}
+
+function findTagEnd(str, start) {
+  let quote = null;
+
+  for (let i = start; i < str.length; i++) {
+    const char = str[i];
+
+    if ((char === '"' || char === "'") && str[i - 1] !== "\\") {
+      if (quote === char) {
+        quote = null;
+      } else if (!quote) {
+        quote = char;
+      }
+    }
+
+    if (char === ">" && !quote) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+function getTagName(rawTag) {
+  return rawTag.replace(/\/$/, "").trim().split(/\s+/)[0].toLowerCase();
+}
+
+function parseOpeningTag(rawTag) {
+  const cleaned = rawTag.replace(/\/$/, "").trim();
+
+  const firstSpace = cleaned.search(/\s/);
+
+  let tag = cleaned;
+  let attrString = "";
+
+  if (firstSpace !== -1) {
+    tag = cleaned.slice(0, firstSpace);
+    attrString = cleaned.slice(firstSpace).trim();
+  }
+
+  const attributes = parseAttributes(attrString);
+
   return {
-    "Conversion results": "should be instead of this json obj",
-    "Just to show that it is dynamic value (input length)" : htmlText.length,
+    tag: tag.toLowerCase(),
+    attributes,
   };
 }
 
-function showExample1() {
-  const htmlExample = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport">
-    <title>Sample HTML</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <header>
-        <h1>Welcome to My Website</h1>
-    </header>
-    <nav>
-        <ul>
-            <li><a href="#home">Home</a></li>
-            <li><a href="#about">About</a></li>
-            <li><a href="#contact">Contact</a></li>
-        </ul>
-    </nav>
-    <main>
-        <section id="home">
-            <h2>Home Section</h2>
-            <p>This is the home section of the webpage.</p>
-        </section>
-        <section id="about">
-            <h2>About Section</h2>
-            <p>This is the about section of the webpage.</p>
-        </section>
-    </main>
-    <footer>
-        <p>&copy; 2024 My Website</p>
-    </footer>
-    <script src="script.js"></script>
-</body>
-</html>
-`;
-  const jsonContent = {
-    "Comment 1":
-      "You have to think about how to take into account various html inputs so your json structure will cover them all and handle different cases.",
-    "Comment 2":
-      "When you make any choice in terms of selecting specific json structure for conversion - be ready to provide reasoning behind such choice.",
-  };
+function parseAttributes(attrString) {
+  const attributes = {};
 
-  document.getElementById("html").value = htmlExample;
-  document.getElementById("json").textContent = JSON.stringify(
-    jsonContent,
-    null,
-    2
-  );
+  if (!attrString) {
+    return attributes;
+  }
+
+  const regex = /([^\s=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
+
+  let match;
+
+  while ((match = regex.exec(attrString)) !== null) {
+    const key = match[1];
+
+    const value = match[2] ?? match[3] ?? match[4] ?? true;
+
+    attributes[key] = value;
+  }
+
+  return attributes;
 }
 
-function showExample2() {
-  const htmlExample = `<div>
-<p>Hello world!</p>
-  <button>Click me!</button>
-  <textarea>Some very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long string.</textarea>
-</div>
-`;
-  const jsonContent = {
-    "Comment 1":
-      "You have to think about how to take into account various html inputs so your json structure will cover them all and handle different cases.",
-    "Comment 2":
-      "When you make any choice in terms of selecting specific json structure for conversion - be ready to provide reasoning behind such choice.",
+function appendText(stack, text) {
+  if (!text || !text.trim()) {
+    return;
+  }
+
+  stack[stack.length - 1].children.push({
+    type: "text",
+    content: text,
+  });
+}
+
+//////////////////////////////////////////////
+let files = [];
+let currentIndex = 0;
+
+document.getElementById("fileInput").addEventListener("change", (e) => {
+  files = Array.from(e.target.files);
+  currentIndex = 0;
+  loadFile();
+});
+
+function loadFile() {
+  if (!files.length) return;
+
+  const file = files[currentIndex];
+  const reader = new FileReader();
+
+  reader.onload = function (e) {
+    document.getElementById("html").value = e.target.result;
   };
 
-  document.getElementById("html").value = htmlExample;
-  document.getElementById("json").textContent = JSON.stringify(
-    jsonContent,
-    null,
-    2
-  );
+  reader.readAsText(file);
+}
+
+function prevFile() {
+  if (currentIndex > 0) {
+    currentIndex--;
+    loadFile();
+  }
+}
+
+function nextFile() {
+  if (currentIndex < files.length - 1) {
+    currentIndex++;
+    loadFile();
+  }
 }
