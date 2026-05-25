@@ -1,4 +1,3 @@
-console.log("app.js loaded");
 function convertHtml2JsonAndSet() {
   const htmlTextAreaValue = document.getElementById("html").value;
   const jsonObj = html2json(htmlTextAreaValue);

@@ -2,12 +2,13 @@
 
 ## Task Test View 
 I have added a input button so you can appload multiple html files and loop throught them using Prev and Next buttons 
-- how to use:
+- How to use it:
  1. Hit choose file
  2. Choose as many html file as you want (you can upload `html_samples` folder)
- 3. click Open
- 4. user `Prev` and `Next` buttons to ittarate through choosen HTML files
- 5. click on convert to JSON to see `html2json.js` function
+ 3. Click Open
+ 4. User `Prev` and `Next` buttons to ittarate through choosen HTML files
+ 5. Click on convert to JSON to see `html2json.js` function
+
 ## Task Rationale
 This task is designed to evaluate how well you solve problems without having every detail explicitly provided and to assess the quality of your deliverables. This type of task isn't necessarily reflective of your future work but aims to help us understand your thought process and reasoning in the context of software development.
 
